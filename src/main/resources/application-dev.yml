@@ -31,4 +31,4 @@ management:
 custom:
   metrics:
     pushgateway:
-      base-url: 3.37.203.42:9091
+      base-url: http://3.37.203.42:9091
