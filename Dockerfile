@@ -10,7 +10,7 @@ WORKDIR /app
 COPY build/libs/*.jar app.jar
 
 # 4. 포트 오픈
-EXPOSE 8080
+EXPOSE 8888
 
 # 5. 애플리케이션 실행
 ENTRYPOINT ["java", "-jar", "app.jar"]
