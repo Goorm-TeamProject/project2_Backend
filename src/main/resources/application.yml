@@ -1,11 +1,12 @@
 spring:
-  config:
-    activate:
-      on-profile: dev
+  profiles:
+    active: dev
+
 management:
   metrics:
     export:
       prometheus:
+        enabled: true
   endpoints:
     web:
       exposure:
@@ -18,7 +19,7 @@ custom:
   metrics:
     pushgateway:
       enabled: true
-      base-url: 3.37.203.42:9091
+      base-url: http://3.37.203.42:9091
       job: backend-app
 
 logging:
