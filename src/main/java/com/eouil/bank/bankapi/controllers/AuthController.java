@@ -12,6 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.eouil.bank.bankapi.metrics.SecurityMetrics;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.BadCredentialsException;
+
 import java.util.Map;
 
 @Slf4j
@@ -21,6 +25,9 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+
+    @Autowired
+    private SecurityMetrics securityMetrics;
 
     @PostMapping("/join")
     public ResponseEntity<JoinResponse> join(@Valid @RequestBody JoinRequest joinRequest) {
@@ -33,10 +40,18 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         log.info("[POST /login] 로그인 요청: {}", loginRequest);
-        LoginResponse loginResponse = authService.login(loginRequest);
-        log.info("[POST /login] 로그인 성공: {}", loginResponse);
-        return ResponseEntity.ok(loginResponse);
+        try {
+            LoginResponse loginResponse = authService.login(loginRequest);
+            log.info("[POST /login] 로그인 성공: {}", loginResponse);
+            return ResponseEntity.ok(loginResponse);
+        } catch (BadCredentialsException e) {
+            // 로그인 실패시 메트릭 증가
+            securityMetrics.incrementLoginFailure();
+            log.warn("[POST /login] 로그인 실패: 잘못된 자격 증명");
+            throw e;
+        }
     }
+
 
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(@RequestHeader("Authorization") String refreshToken) {

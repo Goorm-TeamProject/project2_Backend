@@ -7,10 +7,13 @@ plugins {
 group = 'com.eouil.bank'
 version = '0.0.1-SNAPSHOT'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+//java {
+//    toolchain {
+//        languageVersion = JavaLanguageVersion.of(17)
+//    }
+//}
+tasks.withType(JavaCompile).configureEach {
+    options.fork = false
 }
 
 configurations {
@@ -36,6 +39,12 @@ configurations.all {
 repositories {
     mavenCentral()
     maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'software.amazon.awssdk:bom:2.20.20'
+    }
 }
 
 dependencies {
@@ -77,6 +86,16 @@ dependencies {
     //redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'io.lettuce:lettuce-core' // Lettuce 클라이언트 사용 시
+
+    //Prometheus Pushgateway 연동
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus:1.12.3'
+    implementation 'io.prometheus:simpleclient_pushgateway:0.16.0'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // AWS SES
+    implementation 'software.amazon.awssdk:ses'
+    implementation 'software.amazon.awssdk:sdk-core'
 }
 
 tasks.named('test') {

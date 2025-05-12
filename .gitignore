@@ -38,4 +38,5 @@ out/
 
 ### Hide secret files ###
 .env
+env
 application.yml

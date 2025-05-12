@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,7 @@ public class TransactionService {
     private final TransactionJdbcRepository transactionRepository;
     private final TransactionRepository transactionJPARepository;
     private final JwtUtil jwtUtil;
+    private final AlertService alertService;
 
     @Transactional
     public TransactionResponseDTO transfer(TransferRequestDTO request, String token) {
@@ -92,6 +94,17 @@ public class TransactionService {
         if (fromAccount.getBalance().compareTo(request.getAmount()) < 0) {
             log.warn("[WITHDRAW] 잔액 부족 - 계좌 {}, 잔액 {}, 요청금액 {}", fromAccount.getAccountNumber(), fromAccount.getBalance(), request.getAmount());
             throw new RuntimeException("Insufficient funds");
+        }
+
+        // 이상 금액 감지
+        BigDecimal limit = new BigDecimal("1000000"); // 100만원 기준
+        if (fromAccount.getBalance().compareTo(limit) >= 0) {
+            log.warn("[WITHDRAW] 알림 - 계좌 {}에서 {} 이상의 큰 출금을 시도",fromAccount.getAccountNumber(), limit);
+            alertService.sendSuspiciousWithdrawalEmail(
+                    user.getEmail(), // 로그인 유저 이메일
+                    fromAccount.getAccountNumber(),
+                    request.getAmount()
+            );
         }
 
         fromAccount.setBalance(fromAccount.getBalance().subtract(request.getAmount()));
