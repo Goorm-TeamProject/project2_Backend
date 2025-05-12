@@ -3,6 +3,9 @@ spring:
     activate:
       on-profile: dev
 management:
+  metrics:
+    export:
+      prometheus:
   endpoints:
     web:
       exposure:
@@ -11,9 +14,29 @@ management:
     prometheus:
       enabled: true
 
+custom:
+  metrics:
+    pushgateway:
+      enabled: true
+      base-url: 3.37.203.42:9091
+      job: backend-app
+
 logging:
   level:
     root: INFO
     com.eouil.bank.bankapi: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+cloud:
+  aws:
+    region:
+      static: ap-northeast-2
+    credentials:
+      access-key: ${ACCESS_KEY}
+      secret-key: ${SECRET_KEY}
+    ses:
+      sender: ${AWS_SES_SENDER}
+
+jwt:
+  secret: ${JWT_SECRET}

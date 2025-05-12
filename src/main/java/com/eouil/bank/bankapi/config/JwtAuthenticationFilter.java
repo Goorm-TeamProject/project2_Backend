@@ -11,15 +11,23 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.eouil.bank.bankapi.metrics.SecurityMetrics;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 
+@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final UserRepository userRepository;
     private final RedisTokenService redisTokenService;
     private final JwtUtil jwtUtil;
+
+    @Autowired
+    private SecurityMetrics securityMetrics;
 
     public JwtAuthenticationFilter(UserRepository userRepository, RedisTokenService redisTokenService, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
@@ -69,8 +77,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
-        } catch (Exception e) {
-            //인증 실패 → 명시적으로 401 Unauthorized 반환
+        } catch (JwtException | IllegalArgumentException e) {
+        //인증 실패 → 명시적으로 401 Unauthorized 반환/메트릭 증가
+            securityMetrics.incrementInvalidJwt();
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
             return;
         }
