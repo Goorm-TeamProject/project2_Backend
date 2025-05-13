@@ -1,3 +1,6 @@
+server:
+  port: 8888
+
 spring:
   config:
     activate:
@@ -14,6 +17,9 @@ spring:
       max-lifetime: 600000
       connection-timeout: 30000
 
+jwt:
+  secret: ${JWT_SECRET}
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -28,3 +34,14 @@ spring:
       host: 52.78.24.102
       port: 6379
       timeout: 60000
+
+  management:
+    metrics:
+      export:
+        prometheus:
+          enabled: true
+
+  custom:
+    metrics:
+      pushgateway:
+        base-url: http://3.37.203.42:9091
