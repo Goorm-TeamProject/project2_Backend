@@ -6,9 +6,13 @@ import com.eouil.bank.bankapi.dtos.requests.LoginRequest;
 import com.eouil.bank.bankapi.dtos.responses.LoginResponse;
 import com.eouil.bank.bankapi.dtos.responses.LogoutResponse;
 import com.eouil.bank.bankapi.services.AuthService;
+import com.eouil.bank.bankapi.utils.JwtUtil;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +29,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtUtil jwtUtil;
 
     @Autowired
     private SecurityMetrics securityMetrics;
@@ -67,7 +72,7 @@ public class AuthController {
 
 
     @PostMapping("/logout")
-    public ResponseEntity<LogoutResponse> logout(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<LogoutResponse> logout(@RequestHeader("Authorization") String token, HttpServletResponse response) {
         log.info("[POST /logout] 로그아웃 요청");
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
@@ -75,6 +80,11 @@ public class AuthController {
 
         authService.logout(token);
         log.info("[POST /logout] 로그아웃 완료");
+
+        Cookie cookie = new Cookie("accessToken", null);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
 
         return ResponseEntity.ok(new LogoutResponse("로그아웃 완료"));
     }
@@ -89,11 +99,26 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<?> verifyMfa(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> verifyMfa(@RequestBody Map<String, String> payload, HttpServletResponse response) {
         String email = payload.get("email");
         int code = Integer.parseInt(payload.get("code"));
 
         boolean result = authService.verifyCode(email, code);
-        return ResponseEntity.ok(Map.of("success", result));
+
+        if (result) {
+            String userId = authService.getUserIdByEmail(email);
+            String verifiedAccessToken = jwtUtil.generateAccessToken(userId, true);
+
+            Cookie cookie = new Cookie("accessToken", verifiedAccessToken);
+            cookie.setHttpOnly(true);
+            cookie.setSecure(true);
+            cookie.setPath("/");
+            response.addCookie(cookie);
+
+            return ResponseEntity.ok(Map.of("success", true));
+        }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("success", false));
     }
+
 }

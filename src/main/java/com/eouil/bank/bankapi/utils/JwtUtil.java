@@ -21,10 +21,15 @@ public class JwtUtil {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
-    // access token
     public String generateAccessToken(String userId) {
+        return generateAccessToken(userId, true);
+    }
+
+    // access token
+    public String generateAccessToken(String userId, boolean mfaVerified) {
         return Jwts.builder()
                 .setSubject(userId)
+                .claim("mfaVerified", mfaVerified)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_EXP))
                 .signWith(key, SignatureAlgorithm.HS256)
