@@ -9,7 +9,6 @@ public class BankapiApplication {
 	public static void main(String[] args) {
 		Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
 
-		// .env 값들을 진짜 환경변수로 등록
 		dotenv.entries().forEach(entry -> {
 			if (System.getenv(entry.getKey()) == null) {
 				System.setProperty(entry.getKey(), entry.getValue());

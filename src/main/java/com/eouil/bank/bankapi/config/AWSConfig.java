@@ -8,7 +8,6 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ses.SesClient;
 
 @Configuration
-@Profile("!test")
 public class AWSConfig {
 
     @Value("${cloud.aws.region.static}")

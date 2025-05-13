@@ -88,7 +88,7 @@ public class AuthService {
             throw new InvalidPasswordException();
         }
 
-        String accessToken = jwtUtil.generateAccessToken(user.getUserId());
+        String accessToken = jwtUtil.generateAccessToken(user.getUserId(),false);
         String refreshToken = jwtUtil.generateRefreshToken(user.getUserId());
 
         // Redis에 리프레시 토큰 저장
@@ -193,4 +193,10 @@ public class AuthService {
             saveSecretToRedis(user.getEmail(), secret);
         }
     }
+    public String getUserIdByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(User::getUserId)
+                .orElseThrow(() -> new UserNotFoundException(email));
+    }
+
 }
