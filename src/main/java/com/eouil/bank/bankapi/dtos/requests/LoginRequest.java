@@ -1,7 +1,11 @@
 package com.eouil.bank.bankapi.dtos.requests;
 
 import jakarta.validation.constraints.*;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 public class LoginRequest {
     @NotNull(message = "이메일은 필수 항목입니다.")
     @Email(message = "유효한 이메일 형식이 아닙니다.")

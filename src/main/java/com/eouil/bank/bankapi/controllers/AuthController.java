@@ -52,25 +52,41 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+        log.info("[LOGIN] 요청 - email: {}", loginRequest.getEmail());
+
         InternalLoginResult result = authService.login(loginRequest);
+
+        log.info("[LOGIN] 성공 - userId: {}, MFA 등록 여부: {}", loginRequest.getEmail(), result.isMfaRegistered());
 
         ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", result.getAccessToken())
                 .httpOnly(true)
-                .secure(true)  // 로컬 테스트 시 false 가능
+                .secure(true)
                 .path("/")
                 .maxAge(Duration.ofMinutes(5))
                 .sameSite("None")
                 .build();
 
-        response.setHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(Duration.ofDays(7))
+                .sameSite("None")
+                .build();
 
-        // accessToken은 응답에 포함시키지 않음
+        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+
         return ResponseEntity.ok(new LoginResponse(result.getRefreshToken(), result.isMfaRegistered()));
     }
+
+
 
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(@CookieValue("refreshToken") String refreshToken,
                                                  HttpServletResponse response) {
+        log.info("[REFRESH] 요청 - refreshToken 수신됨");
+
         InternalLoginResult result = authService.refreshAccessToken(refreshToken);
 
         // accessToken → 쿠키에 저장
@@ -79,12 +95,21 @@ public class AuthController {
                 .secure(true)
                 .path("/")
                 .maxAge(Duration.ofMinutes(5))
-                .sameSite("Strict")
+                .sameSite("None")
                 .build();
 
-        response.setHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+        // ✅ refreshToken도 쿠키로 재설정 (선택이지만 보통 UX 상 안정적)
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(Duration.ofDays(7))
+                .sameSite("None")
+                .build();
 
-        // ✅ LoginResponse로 변환해서 프론트에 응답
+        response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+
         return ResponseEntity.ok(new LoginResponse(result.getRefreshToken(), result.isMfaRegistered()));
     }
 
