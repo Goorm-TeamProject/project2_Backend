@@ -59,7 +59,7 @@ public class AuthController {
                 .secure(true)  // 로컬 테스트 시 false 가능
                 .path("/")
                 .maxAge(Duration.ofMinutes(5))
-                .sameSite("Strict")
+                .sameSite("None")
                 .build();
 
         response.setHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
