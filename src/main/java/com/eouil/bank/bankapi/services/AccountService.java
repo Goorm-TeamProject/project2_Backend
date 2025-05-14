@@ -28,8 +28,7 @@ public class AccountService {
         this.jwtUtil = jwtUtil;
     }
 
-    public List<GetMyAccountResponse> getMyaccount(String token) {
-        String userId = jwtUtil.validateTokenAndGetUserId(token);
+    public List<GetMyAccountResponse> getMyaccount(String userId) {
         log.info("[GET MY ACCOUNT] 요청 - userId: {}", userId);
 
         User user = userRepository.findById(userId)

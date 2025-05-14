@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,21 +47,17 @@ public class AccountController {
 
 
     @GetMapping("/accounts/me")
-    public ResponseEntity<List<GetMyAccountResponse>> getMyAccount(
-            @CookieValue(value = "accessToken", required = false) String token) {
+    public ResponseEntity<List<GetMyAccountResponse>> getMyAccount() {
+        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        if (token == null || token.isBlank()) {
-            log.warn("[GET /accounts/me] 요청 실패 - accessToken 쿠키 없음");
-            return ResponseEntity.status(401).build();
-        }
-
-        log.info("[GET /accounts/me] 내 계좌 목록 조회 요청 (토큰 일부: {}...)", token.substring(0, Math.min(10, token.length())));
-        List<GetMyAccountResponse> responses = accountService.getMyaccount(token);
+        log.info("[GET /accounts/me] 내 계좌 목록 조회 요청 - 사용자 ID: {}", userId);
+        List<GetMyAccountResponse> responses = accountService.getMyaccount(userId);
 
         securityMetrics.incrementSensitiveDataAccess();
-
         log.info("[GET /accounts/me] 내 계좌 {}건 조회 완료", responses.size());
 
         return ResponseEntity.ok(responses);
     }
+
+
 }
