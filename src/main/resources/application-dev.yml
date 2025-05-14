@@ -2,23 +2,19 @@ server:
   port: 8888
 
 spring:
-  config:
-    activate:
-      on-profile: dev
-
-datasource:
-  url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-  driver-class-name: org.h2.Driver
-  username: sa
-  password:
-jpa:
-  hibernate:
-    ddl-auto: update
-  properties:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
     hibernate:
-      dialect: org.hibernate.dialect.H2Dialect
-      format_sql: true
-  show-sql: true
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+    show-sql: true
 
 data:
   redis:

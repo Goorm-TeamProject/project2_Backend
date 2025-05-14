@@ -1,7 +1,10 @@
+server:
+  port: 8888
+
 spring:
   profiles:
-    active: prod
-    
+    active: prod  # 여기에 prod 프로파일 활성화
+
 management:
   metrics:
     export:
