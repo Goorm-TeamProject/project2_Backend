@@ -4,14 +4,17 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.Claims;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
 
-import java.security.Key;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.security.Key;
 import java.util.Date;
 
 @Component
+@Slf4j
 public class JwtUtil {
     private final Key key;
     private final long ACCESS_EXP = 1000 * 60 * 5;  // 5분
@@ -30,14 +33,23 @@ public class JwtUtil {
 
     // access token
     public String generateAccessToken(String userId, boolean mfaVerified) {
-        return Jwts.builder()
-                .setSubject(userId)
-                .claim("mfaVerified", mfaVerified)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_EXP))
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+        try {
+            String token = Jwts.builder()
+                    .setSubject(userId)
+                    .claim("mfaVerified", mfaVerified)
+                    .setIssuedAt(new Date())
+                    .setExpiration(new Date(System.currentTimeMillis() + ACCESS_EXP))
+                    .signWith(key, SignatureAlgorithm.HS256)
+                    .compact();
+
+            log.debug("[JwtUtil] accessToken 생성 성공: {}", token);  // ✅ 여기!
+            return token;
+        } catch (Exception e) {
+            log.error("[JwtUtil] accessToken 생성 실패", e);
+            throw new RuntimeException("accessToken 생성 실패", e); // ❌ null 반환 금지
+        }
     }
+
 
     // refresh token
     public String generateRefreshToken(String userId) {
@@ -53,13 +65,14 @@ public class JwtUtil {
     public String validateTokenAndGetUserId(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(key)
-                .setAllowedClockSkewSeconds(60) // ← 1분 정도 시간 차 허용
+                .setAllowedClockSkewSeconds(60) // 1분 정도 시계 차이 허용
                 .build()
-                .parseClaimsJws(token.replace("Bearer ", ""))
+                .parseClaimsJws(token)
                 .getBody();
 
         return claims.getSubject();
     }
+
 
     public long getAccessTokenExpireMillis() {
         return ACCESS_EXP;

@@ -1,9 +1,8 @@
 package com.eouil.bank.bankapi.logging;
 
 import com.eouil.bank.bankapi.utils.JwtUtil;
-import jakarta.servlet.Filter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
+import jakarta.servlet.*;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -25,33 +24,39 @@ public class LogFilter implements Filter {
     }
 
     @Override
-    public void doFilter(
-            jakarta.servlet.ServletRequest request,
-            jakarta.servlet.ServletResponse response,
-            FilterChain chain
-    ) throws IOException, ServletException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
 
         HttpServletRequest httpRequest = (HttpServletRequest) request;
+        String path = httpRequest.getRequestURI();
 
         try {
-            // 1. traceId 생성
+            // 1. Generate and store traceId
             String traceId = UUID.randomUUID().toString();
             MDC.put(TRACE_ID, traceId);
 
-            // 2. Authorization 헤더에서 userId 추출
+            // 2. Extract token from Authorization header only
             String authHeader = httpRequest.getHeader("Authorization");
+            log.debug("[MDC Filter] path={} Authorization header raw: {}", path, authHeader);
+
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
+                log.debug("[MDC Filter] path={} extracted token: {}", path, token);
                 String userId = jwtUtil.validateTokenAndGetUserId(token);
                 MDC.put(USER_ID, userId);
+            } else {
+                log.warn("[MDC Filter] path={} Missing or invalid Authorization header", path);
             }
 
+            // 3. Continue filter chain
             chain.doFilter(request, response);
+
         } catch (Exception e) {
-            log.warn("[MDC Filter Error] {}", e.getMessage());
+            log.warn("[MDC Filter Error] {}", e.getMessage(), e);
             chain.doFilter(request, response);
         } finally {
-            MDC.clear(); // 꼭 해줘야 메모리 누수 방지됨
+            MDC.clear();
         }
     }
+
 }

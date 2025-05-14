@@ -9,6 +9,7 @@ import com.eouil.bank.bankapi.dtos.responses.TransactionResponseDTO;
 import com.eouil.bank.bankapi.services.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,8 +26,12 @@ public class TransactionController {
     @PostMapping("/transfer")
     public ResponseEntity<TransactionResponseDTO> transfer(
             @RequestBody TransferRequestDTO request,
-            @RequestHeader("Authorization") String token
+            @CookieValue(value = "accessToken", required = false) String token
     ) {
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         log.info("[POST /transfer] 요청 도착: {}", request);
         TransactionResponseDTO response = transactionService.transfer(request, token);
         log.info("[POST /transfer] 처리 완료: {}", response);
@@ -36,8 +41,12 @@ public class TransactionController {
     @PostMapping("/withdraw")
     public ResponseEntity<TransactionResponseDTO> withdraw(
             @RequestBody WithdrawRequestDTO request,
-            @RequestHeader("Authorization") String token
+            @CookieValue(value = "accessToken", required = false) String token
     ) {
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         log.info("[POST /withdraw] 요청 도착: {}", request);
         TransactionResponseDTO response = transactionService.withdraw(request, token);
         log.info("[POST /withdraw] 처리 완료: {}", response);
@@ -47,8 +56,12 @@ public class TransactionController {
     @PostMapping("/deposit")
     public ResponseEntity<TransactionResponseDTO> deposit(
             @RequestBody DepositRequestDTO request,
-            @RequestHeader("Authorization") String token
+            @CookieValue(value = "accessToken", required = false) String token
     ) {
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         log.info("[POST /deposit] 요청 도착: {}", request);
         TransactionResponseDTO response = transactionService.deposit(request, token);
         log.info("[POST /deposit] 처리 완료: {}", response);
@@ -57,12 +70,16 @@ public class TransactionController {
 
     @GetMapping
     public ResponseEntity<List<TransactionResponseDTO>> getTransactions(
-            @RequestHeader("Authorization") String authorizationHeader
+            @CookieValue(value = "accessToken", required = false) String token
     ) {
-        String token = authorizationHeader.replace("Bearer ", "");
-        log.info("[GET /transactions] 요청 도착 (토큰: {})", token.substring(0, Math.min(token.length(), 10)) + "...");
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        log.info("[GET /transactions] 요청 도착 (토큰 일부: {}...)", token.substring(0, Math.min(10, token.length())));
         List<TransactionResponseDTO> transactions = transactionService.getTransactions(token);
         log.info("[GET /transactions] 조회 완료: {}건", transactions.size());
+
         return ResponseEntity.ok(transactions);
     }
 }
