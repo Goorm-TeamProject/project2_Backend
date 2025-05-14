@@ -3,7 +3,7 @@ server:
 
 spring:
   profiles:
-    active: prod  # 여기에 prod 프로파일 활성화
+    active: prod
 
 management:
   metrics:

@@ -1,5 +1,6 @@
 package com.eouil.bank.bankapi.services;
 
+import com.eouil.bank.bankapi.domains.InternalLoginResult;
 import com.eouil.bank.bankapi.domains.User;
 import com.eouil.bank.bankapi.dtos.requests.CreateAccountRequest;
 import com.eouil.bank.bankapi.dtos.requests.JoinRequest;
@@ -78,7 +79,7 @@ public class AuthService {
         return new JoinResponse(user.getName(), user.getEmail());
     }
 
-    public LoginResponse login(LoginRequest loginRequest) {
+    public InternalLoginResult login(LoginRequest loginRequest) {
         log.info("[LOGIN] 요청 - email: {}", loginRequest.email);
 
         User user = userRepository.findByEmail(loginRequest.email)
@@ -88,21 +89,22 @@ public class AuthService {
             throw new InvalidPasswordException();
         }
 
-        String accessToken = jwtUtil.generateAccessToken(user.getUserId(),false);
+        // ✅ 무조건 MFA 인증을 요구 (강제 false)
+        boolean mfaRegistered = false;
+
+        String accessToken = jwtUtil.generateAccessToken(user.getUserId(), false);  // mfaVerified=false
         String refreshToken = jwtUtil.generateRefreshToken(user.getUserId());
 
-        // Redis에 리프레시 토큰 저장
         redisTokenService.saveRefreshToken(user.getUserId(), refreshToken, jwtUtil.getRefreshTokenExpireMillis());
 
-        boolean mfaRegistered = user.getMfaSecret() != null;
-
-        log.info("[LOGIN] 성공 - userId: {}, MFA 등록 여부: {}", user.getUserId(), mfaRegistered);
-        return new LoginResponse(accessToken, refreshToken, mfaRegistered);
+        log.info("[LOGIN] 성공 - userId: {}, MFA 강제 인증 적용");
+        return new InternalLoginResult(accessToken, refreshToken, mfaRegistered);  // 항상 false 반환
     }
 
 
-    // 토큰 재발급 요청
-    public LoginResponse refreshAccessToken(String refreshToken) {
+
+
+    public InternalLoginResult refreshAccessToken(String refreshToken) {
         log.info("[REFRESH] 요청");
 
         String userId = jwtUtil.validateTokenAndGetUserId(refreshToken);
@@ -115,10 +117,11 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        String newAccessToken = jwtUtil.generateAccessToken(userId);
         boolean mfaRegistered = user.getMfaSecret() != null;
+        String newAccessToken = jwtUtil.generateAccessToken(userId, mfaRegistered);
 
-        return new LoginResponse(newAccessToken, refreshToken, mfaRegistered); // 이게 핵심!
+        // ✅ InternalLoginResult 사용
+        return new InternalLoginResult(newAccessToken, refreshToken, mfaRegistered);
     }
 
 
@@ -145,6 +148,7 @@ public class AuthService {
 
     public String generateOtpUrlByToken(String token) {
         String userId = jwtUtil.validateTokenAndGetUserId(token);
+        log.info("🔑 토큰 원문: {}", token);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 

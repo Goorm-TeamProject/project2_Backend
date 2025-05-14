@@ -4,18 +4,20 @@ import com.eouil.bank.bankapi.domains.User;
 import com.eouil.bank.bankapi.repositories.UserRepository;
 import com.eouil.bank.bankapi.services.RedisTokenService;
 import com.eouil.bank.bankapi.utils.JwtUtil;
+import com.eouil.bank.bankapi.metrics.SecurityMetrics;
+
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import com.eouil.bank.bankapi.metrics.SecurityMetrics;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 
@@ -41,8 +43,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // 로그인, 회원가입, 리프레시 요청은 필터 통과
-        // 인증이 필요 없는 경로는 필터에서 제외
         if (path.equals("/api/login")
                 || path.equals("/api/join")
                 || path.equals("/api/refresh")
@@ -52,23 +52,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = request.getHeader("Authorization");
+        String token = null;
 
-        if (redisTokenService.isBlacklisted(token)) {
-            throw new JwtException("Blacklisted token");
+        // 1. Authorization 헤더에서 우선 탐색
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
         }
 
-        // 토큰이 없으면 인증 안된 상태로 통과 (403 발생 안 하게)
-        if (token == null || !token.startsWith("Bearer ")) {
+        // 2. 없으면 accessToken 쿠키에서 조회
+        if (token == null && request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        token = token.replace("Bearer ", "");
+        if (redisTokenService.isBlacklisted(token)) {
+            securityMetrics.incrementInvalidJwt();
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Blacklisted token");
+            return;
+        }
+
         try {
             String userId = jwtUtil.validateTokenAndGetUserId(token);
 
-            //유저 검증
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -78,7 +93,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
         } catch (JwtException | IllegalArgumentException e) {
-        //인증 실패 → 명시적으로 401 Unauthorized 반환/메트릭 증가
             securityMetrics.incrementInvalidJwt();
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
             return;

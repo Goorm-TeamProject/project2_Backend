@@ -29,3 +29,6 @@ spring:
       host: 52.78.24.102
       port: 6379
       timeout: 60000
+
+jwt:
+  secret: ${JWT_SECRET}
