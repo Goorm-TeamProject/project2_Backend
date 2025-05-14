@@ -14,17 +14,17 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.HttpHeaders;
+import java.time.Duration;
+
 import com.eouil.bank.bankapi.metrics.SecurityMetrics;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.BadCredentialsException;
 
-import java.time.Duration;
 import java.util.Map;
 
 @Slf4j
@@ -143,26 +143,34 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<?> verifyMfa(@RequestBody Map<String, String> payload, HttpServletResponse response) {
+    public ResponseEntity<?> verifyMfa(@RequestBody Map<String, String> payload,
+                                       HttpServletResponse response) {
         String email = payload.get("email");
-        int code = Integer.parseInt(payload.get("code"));
+        int code   = Integer.parseInt(payload.get("code"));
 
         boolean result = authService.verifyCode(email, code);
 
         if (result) {
-            String userId = authService.getUserIdByEmail(email);
+            String userId             = authService.getUserIdByEmail(email);
             String verifiedAccessToken = jwtUtil.generateAccessToken(userId, true);
 
-            Cookie cookie = new Cookie("accessToken", verifiedAccessToken);
-            cookie.setHttpOnly(true);
-            cookie.setSecure(true);
-            cookie.setPath("/");
-            response.addCookie(cookie);
+            // SameSite=None, Secure, HttpOnly 쿠키로 재발급
+            ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", verifiedAccessToken)
+                    .httpOnly(true)
+                    .secure(true)
+                    .path("/")
+                    .sameSite("None")                    // 크로스사이트 AJAX 요청에도 전송
+                    .maxAge(Duration.ofMinutes(5))      // 토큰 만료 시간과 맞춰주세요
+                    .build();
+
+            // 쿠키 헤더를 덮어씌워 보내기
+            response.setHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
 
             return ResponseEntity.ok(Map.of("success", true));
         }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("success", false));
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("success", false));
     }
-
 }
