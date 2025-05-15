@@ -13,15 +13,21 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
 
 @Component
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final UserRepository userRepository;
@@ -46,25 +52,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (path.equals("/api/login")
                 || path.equals("/api/join")
                 || path.equals("/api/refresh")
-                || path.equals("/api/logout")
-                || path.startsWith("/api/mfa/")) {
+                || path.equals("/api/logout"))
+        {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = null;
 
-        // 1. Authorization 헤더에서 우선 탐색
+        // 1) Authorization 헤더 로그
         String authHeader = request.getHeader("Authorization");
+        log.debug("[JwtFilter] Authorization header: {}", authHeader);
+
+        String token = null;
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
         }
 
-        // 2. 없으면 accessToken 쿠키에서 조회
+        // 2) 헤더 없으면 쿠키에서 추출 & 로그
         if (token == null && request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
+                log.debug("[JwtFilter] Cookie {}={}", cookie.getName(), cookie.getValue());
                 if ("accessToken".equals(cookie.getName())) {
                     token = cookie.getValue();
+                    log.debug("[JwtFilter] Token from cookie: {}", token);
                     break;
                 }
             }
@@ -83,18 +93,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             String userId = jwtUtil.validateTokenAndGetUserId(token);
+            log.debug("[JwtFilter] Token valid, userId={}", userId);
 
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                    user.getUserId(), null, null
-            );
-            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+            SecurityContextHolder.getContext().setAuthentication(auth);
+            log.debug("[JwtFilter] SecurityContext set with principal={}", auth.getPrincipal());
 
-        } catch (JwtException | IllegalArgumentException e) {
-            securityMetrics.incrementInvalidJwt();
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+        } catch (JwtException e) {
+            log.warn("[JwtFilter] Invalid token", e);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
             return;
         }
 

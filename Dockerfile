@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 openjdk:17-jdk-slim
+FROM --platform=linux/amd64 openjdk:21-jdk-slim
 
 # 1. 환경변수 파일 복사
 COPY .env .env

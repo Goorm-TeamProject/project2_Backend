@@ -1,5 +1,6 @@
 package com.eouil.bank.bankapi.controllers;
 
+import com.eouil.bank.bankapi.domains.User;
 import com.eouil.bank.bankapi.dtos.requests.CreateAccountRequest;
 import com.eouil.bank.bankapi.dtos.responses.CreateAccountResponse;
 import com.eouil.bank.bankapi.dtos.responses.GetMyAccountResponse;
@@ -48,7 +49,8 @@ public class AccountController {
 
     @GetMapping("/accounts/me")
     public ResponseEntity<List<GetMyAccountResponse>> getMyAccount() {
-        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String userId = user.getUserId();
 
         log.info("[GET /accounts/me] 내 계좌 목록 조회 요청 - 사용자 ID: {}", userId);
         List<GetMyAccountResponse> responses = accountService.getMyaccount(userId);
@@ -58,6 +60,7 @@ public class AccountController {
 
         return ResponseEntity.ok(responses);
     }
+
 
 
 }
