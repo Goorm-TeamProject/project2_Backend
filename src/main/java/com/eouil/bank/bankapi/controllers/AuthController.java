@@ -98,7 +98,7 @@ public class AuthController {
                 .sameSite("None")
                 .build();
 
-        // ✅ refreshToken도 쿠키로 재설정 (선택이지만 보통 UX 상 안정적)
+        //refreshToken도 쿠키로 재설정 (선택이지만 보통 UX 상 안정적)
         ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
                 .httpOnly(true)
                 .secure(true)
