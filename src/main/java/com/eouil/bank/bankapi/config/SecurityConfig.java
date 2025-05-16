@@ -26,14 +26,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "https://eouil.com",
-                "http://localhost:5173"
+        config.setAllowedOriginPatterns(List.of(
+                "https://*.eouil.com",
+                "https://eouil.com"
         ));
-        config.setAllowedMethods(List.of("*"));
-        config.setAllowedHeaders(List.of("*"));
+        // 2) 자격증명(쿠키) 허용
         config.setAllowCredentials(true);
-        // 필요시 클라이언트에서 노출할 헤더
+        // 3) 허용 메서드
+        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
+        // 4) 모든 헤더 허용
+        config.setAllowedHeaders(List.of("*"));
+        // 5) 클라이언트에 노출할 헤더 (Set-Cookie)
         config.setExposedHeaders(List.of("Set-Cookie"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -54,26 +57,25 @@ public class SecurityConfig {
     // 3) SecurityFilterChain에 람다 기반 CORS·헤더 설정 적용
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-                                           JwtAuthenticationFilter jwtAuthenticationFilter)
-            throws Exception {
+                                           JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
+                // ① CORS 필터 등록
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // ② CSRF 끄고
                 .csrf(csrf -> csrf.disable())
-                .formLogin(form -> form.disable())
-                .logout(logout -> logout.disable())
-                .httpBasic(basic -> basic.disable())
-
+                // ③ OPTIONS 프리플라이트는 무조건 허용
                 .authorizeHttpRequests(authz -> authz
-                        // 1) 모든 pre-flight OPTIONS 요청 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // 2) public API 허용
                         .requestMatchers(
                                 "/api/join","/api/login","/api/refresh",
                                 "/api/logout","/api/health","/api/mfa/**"
                         ).permitAll()
-                        // 3) 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )
+                .formLogin(form -> form.disable())
+                .logout(logout -> logout.disable())
+                .httpBasic(basic -> basic.disable())
+                // ④ JWT 필터
                 .addFilterBefore(jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class);
 

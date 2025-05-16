@@ -5,26 +5,23 @@ import com.eouil.bank.bankapi.dtos.requests.JoinRequest;
 import com.eouil.bank.bankapi.dtos.responses.JoinResponse;
 import com.eouil.bank.bankapi.dtos.requests.LoginRequest;
 import com.eouil.bank.bankapi.dtos.responses.LoginResponse;
-import com.eouil.bank.bankapi.dtos.responses.LogoutResponse;
 import com.eouil.bank.bankapi.services.AuthService;
 import com.eouil.bank.bankapi.utils.JwtUtil;
-import jakarta.servlet.http.Cookie;
+import com.eouil.bank.bankapi.metrics.SecurityMetrics;
+
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.HttpHeaders;
 import java.time.Duration;
-
-import com.eouil.bank.bankapi.metrics.SecurityMetrics;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import java.util.Map;
 
 @Slf4j
@@ -35,12 +32,10 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtUtil jwtUtil;
+    private final SecurityMetrics securityMetrics;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
-
-    @Autowired
-    private SecurityMetrics securityMetrics;
 
     @PostMapping("/join")
     public ResponseEntity<JoinResponse> join(@Valid @RequestBody JoinRequest joinRequest) {
@@ -51,27 +46,30 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+    public ResponseEntity<LoginResponse> login(
+            @RequestBody LoginRequest loginRequest,
+            HttpServletResponse response
+    ) {
         log.info("[LOGIN] 요청 - email: {}", loginRequest.getEmail());
-
         InternalLoginResult result = authService.login(loginRequest);
-
-        log.info("[LOGIN] 성공 - userId: {}, MFA 등록 여부: {}", loginRequest.getEmail(), result.isMfaRegistered());
+        log.info("[LOGIN] 성공 - email: {}, MFA 등록 여부: {}", loginRequest.getEmail(), result.isMfaRegistered());
 
         ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", result.getAccessToken())
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
-                .maxAge(Duration.ofMinutes(5))
+                .domain(".eouil.com")
                 .sameSite("None")
+                .maxAge(Duration.ofMinutes(5))
                 .build();
 
         ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
-                .maxAge(Duration.ofDays(7))
+                .domain(".eouil.com")
                 .sameSite("None")
+                .maxAge(Duration.ofDays(7))
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
@@ -79,32 +77,31 @@ public class AuthController {
 
         return ResponseEntity.ok(new LoginResponse(result.getRefreshToken(), result.isMfaRegistered()));
     }
-
-
 
     @PostMapping("/refresh")
-    public ResponseEntity<LoginResponse> refresh(@CookieValue("refreshToken") String refreshToken,
-                                                 HttpServletResponse response) {
+    public ResponseEntity<LoginResponse> refresh(
+            @CookieValue("refreshToken") String refreshToken,
+            HttpServletResponse response
+    ) {
         log.info("[REFRESH] 요청 - refreshToken 수신됨");
-
         InternalLoginResult result = authService.refreshAccessToken(refreshToken);
 
-        // accessToken → 쿠키에 저장
         ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", result.getAccessToken())
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
-                .maxAge(Duration.ofMinutes(5))
+                .domain(".eouil.com")
                 .sameSite("None")
+                .maxAge(Duration.ofMinutes(5))
                 .build();
 
-        //refreshToken도 쿠키로 재설정 (선택이지만 보통 UX 상 안정적)
         ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
-                .maxAge(Duration.ofDays(7))
+                .domain(".eouil.com")
                 .sameSite("None")
+                .maxAge(Duration.ofDays(7))
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
@@ -113,64 +110,86 @@ public class AuthController {
         return ResponseEntity.ok(new LoginResponse(result.getRefreshToken(), result.isMfaRegistered()));
     }
 
-
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@CookieValue(value = "accessToken", required = false) String token,
-                                    HttpServletResponse response) {
-        if (token != null) {
+    public ResponseEntity<?> logout(
+            @CookieValue(value = "accessToken", required = false) String token,
+            HttpServletResponse response
+    ) {
+        log.info("[LOGOUT] 요청 - accessToken 쿠키: {}", token);
+
+        // 토큰이 있으면 서비스에 전달
+        if (token != null && !token.isBlank()) {
             authService.logout(token);
         }
 
-        Cookie cookie = new Cookie("accessToken", null); // 쿠키 삭제
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(0); // 삭제
-        response.addCookie(cookie);
+        // 쿠키 삭제 (accessToken, refreshToken 둘 다)
+        ResponseCookie deleteAccess = ResponseCookie.from("accessToken", "")
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .domain(".eouil.com")
+                .sameSite("None")
+                .maxAge(0)
+                .build();
 
-        return ResponseEntity.ok().build();
+        ResponseCookie deleteRefresh = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .domain(".eouil.com")
+                .sameSite("None")
+                .maxAge(0)
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, deleteAccess.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, deleteRefresh.toString());
+
+        return ResponseEntity.ok(Map.of("success", true));
     }
 
-    @GetMapping("/mfa/setup")
-    public ResponseEntity<?> setupMfa(@CookieValue(value = "accessToken", required = false) String token) {
-        if (token == null || token.isBlank()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing access token.");
-        }
 
+    @GetMapping("/mfa/setup")
+    public ResponseEntity<?> setupMfa(
+            @CookieValue(value = "accessToken", required = false) String token
+    ) {
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Missing access token."));
+        }
         String otpUrl = authService.generateOtpUrlByToken(token);
         log.info("[GET /mfa/setup] MFA URL 생성 완료");
         return ResponseEntity.ok(Map.of("otpUrl", otpUrl));
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<?> verifyMfa(@RequestBody Map<String, String> payload,
-                                       HttpServletResponse response) {
+    public ResponseEntity<?> verifyMfa(
+            @RequestBody Map<String, String> payload,
+            HttpServletResponse response
+    ) {
         String email = payload.get("email");
-        int code   = Integer.parseInt(payload.get("code"));
+        int code = Integer.parseInt(payload.get("code"));
 
-        boolean result = authService.verifyCode(email, code);
+        boolean passed = authService.verifyCode(email, code);
+        if (passed) {
+            String userId = authService.getUserIdByEmail(email);
+            String newToken = jwtUtil.generateAccessToken(userId, true);
 
-        if (result) {
-            String userId             = authService.getUserIdByEmail(email);
-            String verifiedAccessToken = jwtUtil.generateAccessToken(userId, true);
-
-            // SameSite=None, Secure, HttpOnly 쿠키로 재발급
-            ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", verifiedAccessToken)
+            ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", newToken)
                     .httpOnly(true)
                     .secure(true)
                     .path("/")
-                    .sameSite("None")                    // 크로스사이트 AJAX 요청에도 전송
-                    .maxAge(Duration.ofMinutes(5))      // 토큰 만료 시간과 맞춰주세요
+                    .domain(".eouil.com")
+                    .sameSite("None")
+                    .maxAge(Duration.ofMinutes(5))
                     .build();
 
-            // 쿠키 헤더를 덮어씌워 보내기
-            response.setHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+            response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+            log.info("[POST /mfa/verify] MFA 통과, accessToken 재발급");
 
             return ResponseEntity.ok(Map.of("success", true));
         }
 
-        return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("success", false));
     }
 }

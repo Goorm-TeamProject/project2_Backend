@@ -15,4 +15,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             "WHERE t.fromAccount.accountNumber = :accountNumber " +
             "OR t.toAccount.accountNumber = :accountNumber")
     List<Transaction> findByAccountNumber(@Param("accountNumber") String accountNumber);
+
+    List<Transaction> findByFromAccount_User_UserIdOrToAccount_User_UserIdOrderByCreatedAtAsc(
+            String fromUserId,
+            String toUserId
+    );
 }
