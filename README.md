@@ -88,3 +88,8 @@
 | 💸 **비용 경보 시스템**           | AWS Budgets 기준 **\$60 중 80% 초과 시 알림 설정 완료**   |
 | 🗑️ **이미지 정리 정책**          | ECR에 대해 **30일 이상 미사용 이미지 자동 삭제 정책** 적용        |
 | 🔄 **배포 자동화**              | Jenkins 기반 CI/CD 구축 + **배포 실패 시 자동 롤백** 전략 구현 |
+
+
+## 시스템 아키텍처
+<img width="1016" alt="image" src="https://github.com/user-attachments/assets/aa4459bb-c48a-4a27-b1ab-83ede24a2f6e" />
+
